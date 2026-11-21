@@ -3,7 +3,8 @@ The live voice conversation. The browser and the server talk over one
 WebSocket using small JSON messages:
 
   browser -> server   hello, settings, audio, text, interrupt
-  server -> browser   ready, transcript, thinking, speech, done, interrupted, error
+  server -> browser   ready, title, transcript, thinking, speech, done, suggestions,
+                      interrupted, error
 """
 
 import asyncio
@@ -16,6 +17,7 @@ from .memory import build_context, maybe_summarize
 from .models import Conversation, Message
 from .providers import MODES, PROVIDERS, ProviderError, get_chat, get_speech
 from .sentences import split_sentences
+from .suggestions import suggest_follow_ups
 
 router = APIRouter()
 
@@ -115,8 +117,14 @@ class VoiceSession:
 
             await self.send("thinking")
             await self.speak_reply(get_chat(self.provider, self.mode).stream(system, history), spoken)
-            self.save_reply(" ".join(spoken))
+            reply = " ".join(spoken)
+            self.save_reply(reply)
             await self.send("done")
+
+            # extras, after Buddy has finished talking so they don't slow him down
+            history.append({"role": "assistant", "content": reply})
+            fast_chat = get_chat(self.provider, "fast")
+            await self.send("suggestions", items=await suggest_follow_ups(fast_chat, history))
             await self.tidy_up_memory()
         except ProviderError as e:
             await self.send("error", message=str(e))
