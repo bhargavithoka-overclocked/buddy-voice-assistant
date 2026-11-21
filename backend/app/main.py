@@ -7,6 +7,7 @@ from . import models  # noqa: F401  (registers the tables)
 from .config import settings
 from .database import Base, engine
 from .routers import conversations
+from .voice import router as voice_router
 
 
 @asynccontextmanager
@@ -24,6 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(conversations.router)
+app.include_router(voice_router)
 
 
 @app.get("/health")

@@ -1,0 +1,69 @@
+import base64
+
+
+def receive_until(ws, kind):
+    """Collect messages until one of type `kind` arrives."""
+    seen = []
+    while True:
+        message = ws.receive_json()
+        seen.append(message)
+        if message["type"] == kind:
+            return seen
+
+
+def start(ws, **extra):
+    ws.send_json({"type": "hello", **extra})
+    return ws.receive_json()
+
+
+def test_hello_creates_a_conversation(client):
+    with client.websocket_connect("/ws") as ws:
+        ready = start(ws)
+    assert ready["type"] == "ready"
+    assert client.get(f"/api/conversations/{ready['conversation_id']}").status_code == 200
+
+
+def test_hello_continues_an_existing_conversation(client):
+    existing = client.post("/api/conversations").json()
+    with client.websocket_connect("/ws") as ws:
+        assert start(ws, conversation_id=existing["id"])["conversation_id"] == existing["id"]
+
+
+def test_typed_message_gets_a_spoken_reply(client):
+    with client.websocket_connect("/ws") as ws:
+        conversation_id = start(ws)["conversation_id"]
+        ws.send_json({"type": "text", "text": "What's your favourite food?"})
+        messages = receive_until(ws, "done")
+
+    kinds = [m["type"] for m in messages]
+    assert kinds[:2] == ["title", "thinking"]
+    speech = [m for m in messages if m["type"] == "speech"]
+    assert speech and speech[0]["index"] == 0
+    assert speech[0]["format"] == "wav"
+    assert base64.b64decode(speech[0]["audio"])[:4] == b"RIFF"
+
+    saved = client.get(f"/api/conversations/{conversation_id}").json()
+    assert saved["title"] == "What's your favourite food?"
+    assert [m["role"] for m in saved["messages"]] == ["user", "assistant"]
+    assert saved["messages"][1]["content"] == " ".join(m["text"] for m in speech)
+
+
+def test_audio_is_transcribed_first(client):
+    with client.websocket_connect("/ws") as ws:
+        start(ws)
+        ws.send_json({"type": "audio", "mime": "audio/wav", "data": base64.b64encode(b"fake audio").decode()})
+        messages = receive_until(ws, "done")
+    assert messages[0] == {"type": "transcript", "text": "Hey Buddy, how are you doing today?"}
+
+
+def test_silence(client):
+    with client.websocket_connect("/ws") as ws:
+        start(ws)
+        ws.send_json({"type": "text", "text": "   "})
+        assert ws.receive_json() == {"type": "nothing_heard"}
+
+
+def test_must_say_hello_first(client):
+    with client.websocket_connect("/ws") as ws:
+        ws.send_json({"type": "text", "text": "hi"})
+        assert ws.receive_json()["type"] == "error"
