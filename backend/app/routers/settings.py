@@ -7,7 +7,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 
 from ..config import settings
-from ..providers import PROVIDERS, ProviderError, get_chat, listens_in_browser
+from ..providers import PROVIDERS, ProviderError, get_chat
 from ..providers.gemini import gemini_key
 from ..providers.piper_voice import FreeSpeech
 
@@ -70,13 +70,20 @@ def openai_status() -> dict:
 def voice_status() -> dict:
     if settings.voice_engine == "openai":
         return {"engine": "openai", "voice": "OpenAI", "listening": "OpenAI", **openai_status()}
+
     has_piper = FreeSpeech().voice_path().exists()
+    if settings.demo_mode:
+        listening = "demo mode"
+    elif settings.voice_engine == "local":
+        listening = "Whisper on this computer"
+    else:
+        listening = "your browser"
     return {
-        "engine": "free",
+        "engine": settings.voice_engine,
         "voice": f"Piper ({settings.piper_voice})" if has_piper else "your browser's voice",
         "piper_installed": has_piper,
         "piper_voice": settings.piper_voice,
-        "listening": "your browser" if listens_in_browser() else "demo mode",
+        "listening": listening,
         "connected": True,
         "source": None,
     }

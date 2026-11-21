@@ -82,3 +82,14 @@ def test_voice_status(client, monkeypatch, tmp_path):
 def test_connection_check(client):
     assert client.post("/api/settings/test/ollama").json() == {"ok": True, "message": "Connected!"}
     assert client.post("/api/settings/test/skynet").status_code == 404
+
+
+def test_voice_status_for_each_engine(client, monkeypatch):
+    monkeypatch.setattr(providers.settings, "demo_mode", False)
+
+    monkeypatch.setattr(providers.settings, "voice_engine", "local")
+    voice = client.get("/api/settings").json()["voice"]
+    assert (voice["engine"], voice["listening"]) == ("local", "Whisper on this computer")
+
+    monkeypatch.setattr(providers.settings, "voice_engine", "free")
+    assert client.get("/api/settings").json()["voice"]["listening"] == "your browser"
