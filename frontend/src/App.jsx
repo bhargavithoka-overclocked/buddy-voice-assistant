@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import Buddy from "./components/Buddy.jsx";
 import ChatLog from "./components/ChatLog.jsx";
+import SidePanel from "./components/SidePanel.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import TypeBox from "./components/TypeBox.jsx";
 import { useBuddy } from "./hooks/useBuddy.js";
 
 const STATUS = {
@@ -81,9 +83,16 @@ export default function App() {
         )}
         {buddy.error && <p className="error">{buddy.error}</p>}
         <ChatLog messages={buddy.messages} />
+        <TypeBox onSend={buddy.sendText} />
       </main>
 
-      <aside className="side-panel" />
+      <SidePanel
+        suggestions={buddy.suggestions}
+        isNewChat={buddy.messages.length === 0}
+        onPick={buddy.sendText}
+        latency={buddy.latency}
+        busy={buddy.state === "thinking" || buddy.state === "speaking"}
+      />
     </div>
   );
 }
