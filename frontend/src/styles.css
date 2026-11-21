@@ -272,3 +272,49 @@ button, input, select { font: inherit; color: inherit; }
 }
 .icon-button:hover { border-color: var(--accent); }
 .icon-button.muted { border-color: var(--bad); }
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 8, 14, 0.7);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 40px 16px;
+  overflow-y: auto;
+  z-index: 10;
+}
+.modal {
+  width: 100%;
+  max-width: 560px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px 24px;
+  line-height: 1.5;
+}
+.modal-head { display: flex; justify-content: space-between; align-items: center; }
+.modal h2 { margin: 0; }
+.modal h3 { margin: 22px 0 6px; font-size: 15px; }
+.modal ol { margin: 0; padding-left: 20px; }
+.modal a { color: var(--accent); }
+.modal code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+
+.notice { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; }
+
+.status-card { border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+.status-line { display: flex; align-items: center; gap: 8px; }
+.status-line .source { color: var(--muted); font-size: 13px; flex: 1; }
+.status-line button {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
+.dot.on { background: var(--good); }
+.models { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.test { font-size: 13px; margin-top: 6px; }
+.test.good { color: var(--good); }
+.test.bad { color: var(--bad); }

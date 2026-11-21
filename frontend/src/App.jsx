@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "./api.js";
 import Buddy from "./components/Buddy.jsx";
 import ChatLog from "./components/ChatLog.jsx";
+import Settings from "./components/Settings.jsx";
 import SidePanel from "./components/SidePanel.jsx";
 import Sidebar from "./components/Sidebar.jsx";
 import TopBar from "./components/TopBar.jsx";
@@ -41,6 +42,7 @@ export default function App() {
   const [conversationId, setConversationId] = useState(null);
   const [provider, setProvider] = useSavedChoice("buddy.provider", "claude");
   const [mode, setMode] = useSavedChoice("buddy.mode", "fast");
+  const [showSettings, setShowSettings] = useState(false);
 
   const refreshList = useCallback(() => {
     api.listConversations().then(setConversations).catch(() => {});
@@ -104,7 +106,7 @@ export default function App() {
           mode={mode}
           onProvider={setProvider}
           onMode={setMode}
-          onSettings={() => {}}
+          onSettings={() => setShowSettings(true)}
           muted={buddy.muted}
           onMute={buddy.toggleMute}
           micOn={buddy.state !== "asleep"}
@@ -126,6 +128,8 @@ export default function App() {
         latency={buddy.latency}
         busy={buddy.state === "thinking" || buddy.state === "speaking"}
       />
+
+      {showSettings && <Settings onClose={() => setShowSettings(false)} />}
     </div>
   );
 }
