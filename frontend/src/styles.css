@@ -333,3 +333,15 @@ button, input, select { font: inherit; color: inherit; }
 
 .modal details { margin-top: 20px; }
 .modal summary { cursor: pointer; color: var(--accent); }
+
+.folder-row { display: flex; gap: 8px; align-items: center; }
+.folder-row code { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 6px 8px; }
+.folder-row button, .modal .danger {
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.modal .danger { border-color: var(--bad); color: var(--bad); margin-top: 8px; }
+.check { display: flex; gap: 8px; align-items: center; }

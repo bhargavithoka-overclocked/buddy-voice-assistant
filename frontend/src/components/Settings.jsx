@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
+import DesktopSettings from "./DesktopSettings.jsx";
 
 function Status({ name, info, provider, extra }) {
   const [test, setTest] = useState(null);
@@ -83,26 +84,36 @@ export default function Settings({ onClose }) {
           </>
         )}
 
-        <h3>Free: AI on your own computer (Ollama)</h3>
-        <ol>
-          <li>Download Ollama from <a href="https://ollama.com/download" target="_blank" rel="noreferrer">ollama.com</a> and open it.</li>
-          <li>Download the two models Buddy uses (a few GB, once):</li>
-        </ol>
-        <Code>ollama pull {settings?.ollama.models.fast || "llama3.2:3b"}{"\n"}ollama pull {settings?.ollama.models.smart || "llama3.1:8b"}</Code>
-        <p className="hint">That's it, no account or key. It runs offline and nothing leaves your computer.</p>
+        <DesktopSettings />
+
+        {/* in the desktop app the setup wizard already took care of these */}
+        {!window.buddyDesktop && (
+          <>
+            <h3>Free: AI on your own computer (Ollama)</h3>
+            <ol>
+              <li>Download Ollama from <a href="https://ollama.com/download" target="_blank" rel="noreferrer">ollama.com</a> and open it.</li>
+              <li>Download the two models Buddy uses (a few GB, once):</li>
+            </ol>
+            <Code>ollama pull {settings?.ollama.models.fast || "llama3.2:3b"}{"\n"}ollama pull {settings?.ollama.models.smart || "llama3.1:8b"}</Code>
+            <p className="hint">That's it, no account or key. It runs offline and nothing leaves your computer.</p>
+
+            <h3>Free: Buddy's voice (Piper)</h3>
+            <p>Without this he uses your browser's voice, which works but sounds more robotic. From the <code>backend</code> folder:</p>
+            <Code>python -m piper.download_voices {settings?.voice.piper_voice || "en_US-ryan-medium"} --download-dir voices</Code>
+            <p className="hint">About 60 MB, then restart the backend. Listening always uses your browser's speech recognition (Chrome, Edge or Safari).</p>
+          </>
+        )}
 
         <h3>Free: Gemini (smarter, runs in the cloud)</h3>
         <ol>
           <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a> and sign in with a Google account.</li>
           <li>Create an API key. No card needed for the free tier.</li>
-          <li>Add it to <code>backend/.env</code> as <code>GEMINI_API_KEY=...</code> and restart the backend.</li>
+          <li>
+            Add it as <code>GEMINI_API_KEY=...</code> to {window.buddyDesktop ? <code>buddy.env</code> : <code>backend/.env</code>}
+            {window.buddyDesktop ? " in Buddy's folder, then restart Buddy." : " and restart the backend."}
+          </li>
         </ol>
         <p className="hint">The free tier has daily limits, and Google may use free-tier conversations to improve their products.</p>
-
-        <h3>Free: Buddy's voice (Piper)</h3>
-        <p>Without this he uses your browser's voice, which works but sounds more robotic. From the <code>backend</code> folder:</p>
-        <Code>python -m piper.download_voices {settings?.voice.piper_voice || "en_US-ryan-medium"} --download-dir voices</Code>
-        <p className="hint">About 60 MB, then restart the backend. Listening always uses your browser's speech recognition (Chrome, Edge or Safari).</p>
 
         <details>
           <summary>Paid options: Claude and ChatGPT</summary>

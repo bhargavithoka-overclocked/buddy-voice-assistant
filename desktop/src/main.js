@@ -1,7 +1,7 @@
 const { app, BrowserWindow, dialog, ipcMain, session, shell, systemPreferences } = require("electron");
 const path = require("path");
 const fs = require("fs");
-const { layout, readDataDir } = require("./paths");
+const { forgetDataDir, isBuddyFolder, layout, readDataDir } = require("./paths");
 const services = require("./services");
 const { registerSetupHandlers } = require("./setup");
 
@@ -73,6 +73,32 @@ async function launch() {
 
 ipcMain.handle("app:info", () => ({ dataDir, version: app.getVersion() }));
 ipcMain.handle("app:show-data-folder", () => dataDir && shell.openPath(dataDir));
+
+ipcMain.handle("app:uninstall", async (_event, keepData) => {
+  const { response } = await dialog.showMessageBox(mainWindow, {
+    type: "warning",
+    buttons: ["Uninstall", "Cancel"],
+    defaultId: 1,
+    cancelId: 1,
+    message: keepData ? "Remove the Buddy app?" : "Remove Buddy and everything he downloaded?",
+    detail: keepData
+      ? `Your chats and downloads stay in ${dataDir}. If you install Buddy again, pick that folder to carry on where you left off.`
+      : `This deletes ${dataDir}, with all your chats and downloaded models. It can't be undone.`,
+  });
+  if (response !== 0) return false;
+
+  services.stopAll();
+  forgetDataDir();
+  // only ever delete a folder Buddy made himself
+  if (!keepData && dataDir && isBuddyFolder(dataDir)) fs.rmSync(dataDir, { recursive: true, force: true });
+  if (app.isPackaged) {
+    // .../Buddy.app/Contents/MacOS/Buddy -> .../Buddy.app
+    const bundle = path.resolve(process.execPath, "..", "..", "..");
+    if (bundle.endsWith(".app")) await shell.trashItem(bundle);
+  }
+  app.exit(0);
+  return true;
+});
 
 app.whenReady().then(() => {
   allowMicrophone();

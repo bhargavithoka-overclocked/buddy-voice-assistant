@@ -72,6 +72,7 @@ function renderItems() {
 document.getElementById("to-downloads").addEventListener("click", async () => {
   plan = await desktop.plan(folder);
   renderItems();
+  document.getElementById("found-existing").hidden = !plan.existing;
   show("downloads");
 });
 

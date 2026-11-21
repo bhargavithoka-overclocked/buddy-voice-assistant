@@ -4,6 +4,7 @@ const { contextBridge, ipcRenderer } = require("electron");
 contextBridge.exposeInMainWorld("buddyDesktop", {
   info: () => ipcRenderer.invoke("app:info"),
   showDataFolder: () => ipcRenderer.invoke("app:show-data-folder"),
+  uninstall: (keepData) => ipcRenderer.invoke("app:uninstall", keepData),
 
   // first-run setup
   setup: {
