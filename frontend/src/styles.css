@@ -60,12 +60,10 @@ button, input, select { font: inherit; color: inherit; }
   .sidebar, .side-panel { border-width: 0; max-height: 30vh; }
 }
 
-.orb {
-  width: 160px;
-  height: 160px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #ffb37a, var(--accent));
-  box-shadow: 0 0 60px var(--accent-soft);
+.buddy {
+  width: min(380px, 70vw);
+  height: auto;
+  flex-shrink: 0;
 }
 
 .hi-button {
