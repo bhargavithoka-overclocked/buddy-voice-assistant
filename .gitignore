@@ -17,3 +17,7 @@ voices/
 .DS_Store
 .idea/
 .vscode/
+
+# desktop app build output
+desktop/build/
+desktop/dist/

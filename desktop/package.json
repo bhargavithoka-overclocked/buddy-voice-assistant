@@ -1,0 +1,15 @@
+{
+  "name": "buddy-desktop",
+  "productName": "Buddy",
+  "version": "0.1.0",
+  "description": "Buddy, a voice assistant you can talk to, as a Mac app",
+  "author": "Bhargavi Thoka",
+  "private": true,
+  "main": "src/main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "45.2.3"
+  }
+}
