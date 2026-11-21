@@ -106,3 +106,33 @@ def test_done_reports_latency(client):
 
     assert set(latency) == {"transcribed_ms", "first_token_ms", "first_audio_ms", "total_ms"}
     assert latency["transcribed_ms"] <= latency["first_token_ms"] <= latency["first_audio_ms"] <= latency["total_ms"]
+
+
+def test_model_switch_is_used(client, monkeypatch):
+    from app import voice
+    from app.providers.fake import FakeChat
+
+    used = []
+
+    def fake_get_chat(provider, mode):
+        used.append((provider, mode))
+        return FakeChat(delay=0)
+
+    monkeypatch.setattr(voice, "get_chat", fake_get_chat)
+
+    with client.websocket_connect("/ws") as ws:
+        start(ws, provider="claude", mode="fast")
+        ws.send_json({"type": "settings", "provider": "openai", "mode": "smart"})
+        ws.send_json({"type": "text", "text": "hi"})
+        receive_until(ws, "suggestions")
+
+    # the reply uses the chosen model, the extras always use the fast one
+    assert used[0] == ("openai", "smart")
+    assert all(choice == ("openai", "fast") for choice in used[1:])
+
+
+def test_unknown_settings_are_ignored(client):
+    with client.websocket_connect("/ws") as ws:
+        start(ws, provider="gemini", mode="turbo")
+        ws.send_json({"type": "text", "text": "hi"})
+        assert receive_until(ws, "done")[-1]["type"] == "done"

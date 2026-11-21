@@ -4,6 +4,7 @@ import Buddy from "./components/Buddy.jsx";
 import ChatLog from "./components/ChatLog.jsx";
 import SidePanel from "./components/SidePanel.jsx";
 import Sidebar from "./components/Sidebar.jsx";
+import TopBar from "./components/TopBar.jsx";
 import TypeBox from "./components/TypeBox.jsx";
 import { useBuddy } from "./hooks/useBuddy.js";
 
@@ -15,9 +16,31 @@ const STATUS = {
   speaking: "",
 };
 
+// remember the Fast/Smart and Claude/ChatGPT choice between visits
+function useSavedChoice(key, fallback) {
+  const [value, setValue] = useState(() => {
+    try {
+      return localStorage.getItem(key) || fallback;
+    } catch {
+      return fallback;
+    }
+  });
+  const save = (next) => {
+    setValue(next);
+    try {
+      localStorage.setItem(key, next);
+    } catch {
+      // private browsing etc, it just won't be remembered
+    }
+  };
+  return [value, save];
+}
+
 export default function App() {
   const [conversations, setConversations] = useState([]);
   const [conversationId, setConversationId] = useState(null);
+  const [provider, setProvider] = useSavedChoice("buddy.provider", "claude");
+  const [mode, setMode] = useSavedChoice("buddy.mode", "fast");
 
   const refreshList = useCallback(() => {
     api.listConversations().then(setConversations).catch(() => {});
@@ -25,8 +48,8 @@ export default function App() {
 
   const buddy = useBuddy({
     conversationId,
-    provider: "claude",
-    mode: "fast",
+    provider,
+    mode,
     onConversation: (id) => {
       setConversationId(id);
       refreshList();
@@ -76,6 +99,16 @@ export default function App() {
       />
 
       <main className="stage">
+        <TopBar
+          provider={provider}
+          mode={mode}
+          onProvider={setProvider}
+          onMode={setMode}
+          onSettings={() => {}}
+          muted={buddy.muted}
+          onMute={buddy.toggleMute}
+          micOn={buddy.state !== "asleep"}
+        />
         <Buddy state={buddy.state} waving={buddy.waving} getLevel={buddy.getLevel} />
         <p className="status">{STATUS[buddy.state]}</p>
         {buddy.state === "asleep" && (
