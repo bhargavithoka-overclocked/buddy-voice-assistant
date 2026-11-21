@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from . import models  # noqa: F401  (registers the tables)
 from .config import settings
 from .database import Base, engine
+from .routers import conversations
 
 
 @asynccontextmanager
@@ -22,6 +23,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(conversations.router)
 
 
 @app.get("/health")
