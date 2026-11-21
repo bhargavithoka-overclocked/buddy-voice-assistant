@@ -120,3 +120,47 @@ button, input, select { font: inherit; color: inherit; }
 .bubble.user { align-self: flex-end; background: var(--accent); color: #1a1209; border-bottom-right-radius: 4px; }
 .bubble.assistant { align-self: flex-start; background: var(--panel-2); border-bottom-left-radius: 4px; }
 .cut-off { color: var(--muted); font-style: italic; }
+
+.new-chat {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+.new-chat:hover { border-color: var(--accent); color: var(--accent); }
+
+.conversations { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 2px; }
+
+.conversation {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.conversation:hover { background: var(--panel-2); }
+.conversation.active { background: var(--accent-soft); color: var(--accent); }
+.conversation .title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation .actions { display: none; gap: 2px; }
+.conversation:hover .actions { display: flex; }
+.conversation .actions button {
+  border: none;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.conversation .actions button:hover { color: var(--text); }
+.conversation input {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.hint { color: var(--muted); font-size: 13px; }
