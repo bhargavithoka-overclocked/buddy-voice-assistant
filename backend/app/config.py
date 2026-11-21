@@ -9,6 +9,11 @@ class Settings(BaseSettings):
     ollama_fast_model: str = "llama3.2:3b"
     ollama_smart_model: str = "llama3.1:8b"
 
+    # Gemini's free tier (key from aistudio.google.com/apikey)
+    gemini_api_key: str | None = None
+    gemini_fast_model: str = "gemini-3.5-flash-lite"
+    gemini_smart_model: str = "gemini-3.8-flash"
+
     # Claude. The key is optional here: the Anthropic SDK also picks up
     # ANTHROPIC_API_KEY from the environment or an `ant auth login` profile.
     anthropic_api_key: str | None = None

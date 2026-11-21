@@ -29,4 +29,4 @@ def test_finds_keys_from_the_environment(client, monkeypatch, tmp_path):
 
 def test_connection_check(client):
     assert client.post("/api/settings/test/claude").json() == {"ok": True, "message": "Connected!"}
-    assert client.post("/api/settings/test/gemini").status_code == 404
+    assert client.post("/api/settings/test/skynet").status_code == 404

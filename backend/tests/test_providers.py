@@ -25,7 +25,7 @@ def test_picks_model_by_mode(monkeypatch):
     assert get_chat("ollama", "fast").model == "llama3.2:3b"
     assert get_chat("ollama", "smart").name == "Ollama"
     with pytest.raises(ValueError):
-        get_chat("gemini", "fast")
+        get_chat("skynet", "fast")
 
 
 async def collect(stream):
@@ -58,3 +58,20 @@ def test_ollama_not_running(monkeypatch):
     with pytest.raises(ProviderError, match="can't reach Ollama"):
         asyncio.run(collect(chat.stream("hi", [{"role": "user", "content": "hi"}])))
     monkeypatch.setattr(local, "_client", None)
+
+
+def test_gemini_never_borrows_the_openai_key(monkeypatch):
+    from app import providers
+    from app.providers import gemini
+    from app.providers.base import ProviderError
+
+    monkeypatch.setattr(providers.settings, "demo_mode", False)
+    monkeypatch.setattr(providers.settings, "gemini_api_key", None)
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "sk-not-for-google")
+    monkeypatch.setattr(gemini, "_client", None)
+
+    chat = get_chat("gemini", "fast")
+    assert chat.model == "gemini-3.5-flash-lite"
+    with pytest.raises(ProviderError, match="free Gemini key"):
+        asyncio.run(collect(chat.stream("hi", [{"role": "user", "content": "hi"}])))
