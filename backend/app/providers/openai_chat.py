@@ -1,4 +1,5 @@
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
 import openai
 
@@ -16,32 +17,54 @@ def get_client() -> openai.AsyncOpenAI:
     return _client
 
 
+@dataclass
+class ErrorText:
+    """What to tell the user when something goes wrong. {name} and {model} get filled in."""
+
+    no_key: str = "{name} isn't connected. Open Settings to see how to add your OpenAI key."
+    not_found: str = "The {name} model {model} wasn't found. Check the model names in your .env file."
+    offline: str = "I can't reach {name}. Check your internet connection."
+
+
 @asynccontextmanager
-async def friendly_errors(what: str = "ChatGPT"):
+async def friendly_errors(name: str = "ChatGPT", model: str = "", text: ErrorText = ErrorText()):
+    def say(template):
+        return ProviderError(template.format(name=name, model=model))
+
     try:
         yield
+    except ProviderError:
+        raise
     except openai.AuthenticationError as e:
-        raise ProviderError(f"{what} isn't connected. Open Settings to see how to add your OpenAI key.") from e
+        raise say(text.no_key) from e
     except openai.NotFoundError as e:
-        raise ProviderError(f"That {what} model wasn't found. Check the model names in your .env file.") from e
+        raise say(text.not_found) from e
     except openai.RateLimitError as e:
-        raise ProviderError(f"{what} is getting too many requests right now. Try again in a moment.") from e
+        raise ProviderError(f"{name} is getting too many requests right now. Try again in a moment.") from e
     except openai.APIConnectionError as e:
-        raise ProviderError(f"I can't reach {what}. Check your internet connection.") from e
+        raise say(text.offline) from e
     except openai.APIStatusError as e:
-        raise ProviderError(f"{what} returned an error ({e.status_code}). Try again in a moment.") from e
+        raise ProviderError(f"{name} returned an error ({e.status_code}). Try again in a moment.") from e
     except openai.OpenAIError as e:
         # raised when there's no API key at all
-        raise ProviderError(f"{what} isn't set up yet. Open Settings to see how to add your OpenAI key.") from e
+        raise say(text.no_key) from e
 
 
 class OpenAIChat:
-    def __init__(self, model: str):
+    """
+    Chat for anything that speaks the OpenAI API. That's ChatGPT itself, but
+    also Ollama and Gemini, which both offer an OpenAI-compatible endpoint.
+    """
+
+    def __init__(self, model: str, client=get_client, name: str = "ChatGPT", errors: ErrorText = ErrorText()):
         self.model = model
+        self.client = client
+        self.name = name
+        self.errors = errors
 
     async def stream(self, system: str, messages: list[dict]):
-        async with friendly_errors():
-            response = await get_client().chat.completions.create(
+        async with friendly_errors(self.name, self.model, self.errors):
+            response = await self.client().chat.completions.create(
                 model=self.model,
                 messages=[{"role": "system", "content": system}, *messages],
                 stream=True,
