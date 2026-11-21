@@ -96,3 +96,13 @@ def test_interrupt_with_nothing_playing(client):
         ws.send_json({"type": "text", "text": " "})
         # no "interrupted" message, straight to the next reply
         assert ws.receive_json() == {"type": "nothing_heard"}
+
+
+def test_done_reports_latency(client):
+    with client.websocket_connect("/ws") as ws:
+        start(ws)
+        ws.send_json({"type": "audio", "data": base64.b64encode(b"x").decode()})
+        latency = receive_until(ws, "done")[-1]["latency"]
+
+    assert set(latency) == {"transcribed_ms", "first_token_ms", "first_audio_ms", "total_ms"}
+    assert latency["transcribed_ms"] <= latency["first_token_ms"] <= latency["first_audio_ms"] <= latency["total_ms"]

@@ -9,6 +9,7 @@ WebSocket using small JSON messages:
 
 import asyncio
 import base64
+import time
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -27,6 +28,24 @@ def make_title(text: str, limit: int = 40) -> str:
     if len(text) <= limit:
         return text
     return text[:limit].rsplit(" ", 1)[0] + "..."
+
+
+class Timer:
+    """Milliseconds since the turn started, for each step we care about."""
+
+    def __init__(self):
+        self.start = time.perf_counter()
+        self.marks: dict[str, int] = {}
+
+    def mark(self, name: str):
+        # only the first time counts (first token, first audio...)
+        self.marks.setdefault(name, round((time.perf_counter() - self.start) * 1000))
+
+
+async def timed(chunks, timer: Timer):
+    async for chunk in chunks:
+        timer.mark("first_token_ms")
+        yield chunk
 
 
 class VoiceSession:
@@ -96,9 +115,11 @@ class VoiceSession:
 
     async def run_turn(self, text: str, audio: bytes, mime: str):
         spoken = []
+        timer = Timer()
         try:
             if audio:
                 text = await get_speech().transcribe(audio, mime)
+                timer.mark("transcribed_ms")
                 await self.send("transcript", text=text)
             text = text.strip()
             if not text:
@@ -116,10 +137,12 @@ class VoiceSession:
                 system, history = build_context(db, conversation)
 
             await self.send("thinking")
-            await self.speak_reply(get_chat(self.provider, self.mode).stream(system, history), spoken)
+            chunks = get_chat(self.provider, self.mode).stream(system, history)
+            await self.speak_reply(timed(chunks, timer), spoken, timer)
             reply = " ".join(spoken)
             self.save_reply(reply)
-            await self.send("done")
+            timer.mark("total_ms")
+            await self.send("done", latency=timer.marks)
 
             # extras, after Buddy has finished talking so they don't slow him down
             history.append({"role": "assistant", "content": reply})
@@ -139,7 +162,7 @@ class VoiceSession:
             # the fast model is plenty for summaries
             await maybe_summarize(db, conversation, get_chat(self.provider, "fast"))
 
-    async def speak_reply(self, chunks, spoken: list[str]):
+    async def speak_reply(self, chunks, spoken: list[str], timer: Timer):
         """
         Turns each sentence into speech as soon as it's written, while the
         model keeps writing the rest. Sentences are still sent in order.
@@ -160,6 +183,7 @@ class VoiceSession:
             while (item := await queue.get()) is not None:
                 sentence, voice = item
                 audio, audio_format = await voice
+                timer.mark("first_audio_ms")
                 await self.send(
                     "speech",
                     index=index,
