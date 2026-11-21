@@ -73,7 +73,8 @@ export class SpeechPlayer {
 
   checkFinished() {
     if (this.replyComplete && !this.playing && this.decoded.size === 0) {
-      this.replyComplete = false;
+      // the next reply numbers its sentences from 0 again
+      this.reset();
       this.onFinished?.();
     }
   }
