@@ -11,6 +11,8 @@ export default function TopBar({ provider, mode, onProvider, onMode, onSettings,
       </div>
 
       <select value={provider} onChange={(e) => onProvider(e.target.value)} aria-label="AI model">
+        <option value="ollama">Local (free)</option>
+        <option value="gemini">Gemini (free)</option>
         <option value="claude">Claude</option>
         <option value="openai">ChatGPT</option>
       </select>

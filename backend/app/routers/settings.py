@@ -1,15 +1,52 @@
+import asyncio
+import json
 import os
+import urllib.request
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException
 
 from ..config import settings
-from ..providers import PROVIDERS, ProviderError, get_chat
+from ..providers import PROVIDERS, ProviderError, get_chat, listens_in_browser
+from ..providers.gemini import gemini_key
+from ..providers.piper_voice import FreeSpeech
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 # where `ant auth login` keeps its profiles. We only check that it exists, never read it.
 ANT_PROFILE_DIR = Path.home() / ".config" / "anthropic"
+
+
+def models(fast: str, smart: str) -> dict:
+    return {"fast": fast, "smart": smart}
+
+
+def ollama_models() -> list[str] | None:
+    """Names of the models Ollama has downloaded, or None if it isn't running."""
+    try:
+        with urllib.request.urlopen(f"{settings.ollama_url.rstrip('/')}/api/tags", timeout=1.5) as response:
+            return [m["name"] for m in json.load(response).get("models", [])]
+    except (OSError, ValueError):
+        return None
+
+
+async def ollama_status() -> dict:
+    wanted = [settings.ollama_fast_model, settings.ollama_smart_model]
+    installed = await asyncio.to_thread(ollama_models)
+    if installed is None:
+        return {"connected": False, "source": None, "missing": wanted}
+    # "llama3.2" and "llama3.2:latest" are the same model
+    have = set(installed) | {name.removesuffix(":latest") for name in installed}
+    missing = [m for m in dict.fromkeys(wanted) if m not in have]
+    return {"connected": True, "source": "Ollama is running on this computer", "missing": missing}
+
+
+def gemini_status() -> dict:
+    if settings.gemini_api_key:
+        return {"connected": True, "source": "GEMINI_API_KEY in backend/.env"}
+    if gemini_key():
+        return {"connected": True, "source": "environment variable"}
+    return {"connected": False, "source": None}
 
 
 def claude_status() -> dict:
@@ -30,20 +67,36 @@ def openai_status() -> dict:
     return {"connected": False, "source": None}
 
 
+def voice_status() -> dict:
+    if settings.voice_engine == "openai":
+        return {"engine": "openai", "voice": "OpenAI", "listening": "OpenAI", **openai_status()}
+    has_piper = FreeSpeech().voice_path().exists()
+    return {
+        "engine": "free",
+        "voice": f"Piper ({settings.piper_voice})" if has_piper else "your browser's voice",
+        "piper_installed": has_piper,
+        "piper_voice": settings.piper_voice,
+        "listening": "your browser" if listens_in_browser() else "demo mode",
+        "connected": True,
+        "source": None,
+    }
+
+
 @router.get("")
-def get_settings():
+async def get_settings():
     return {
         "demo_mode": settings.demo_mode,
-        "claude": {**claude_status(), "models": {"fast": settings.claude_fast_model, "smart": settings.claude_smart_model}},
-        "openai": {**openai_status(), "models": {"fast": settings.openai_fast_model, "smart": settings.openai_smart_model}},
-        # speech always goes through OpenAI
-        "voice": openai_status(),
+        "ollama": {**await ollama_status(), "models": models(settings.ollama_fast_model, settings.ollama_smart_model)},
+        "gemini": {**gemini_status(), "models": models(settings.gemini_fast_model, settings.gemini_smart_model)},
+        "claude": {**claude_status(), "models": models(settings.claude_fast_model, settings.claude_smart_model)},
+        "openai": {**openai_status(), "models": models(settings.openai_fast_model, settings.openai_smart_model)},
+        "voice": voice_status(),
     }
 
 
 @router.post("/test/{provider}")
 async def test_connection(provider: str):
-    """Sends a tiny request to check the key actually works."""
+    """Sends a tiny request to check the model actually answers."""
     if provider not in PROVIDERS:
         raise HTTPException(404, "Unknown provider")
     try:

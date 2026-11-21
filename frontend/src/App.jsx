@@ -41,7 +41,7 @@ function useSavedChoice(key, fallback) {
 export default function App() {
   const [conversations, setConversations] = useState([]);
   const [conversationId, setConversationId] = useState(null);
-  const [provider, setProvider] = useSavedChoice("buddy.provider", "claude");
+  const [provider, setProvider] = useSavedChoice("buddy.provider", "ollama");
   const [mode, setMode] = useSavedChoice("buddy.mode", "fast");
   const [showSettings, setShowSettings] = useState(false);
 

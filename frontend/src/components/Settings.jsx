@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api.js";
 
-function Status({ name, info, provider }) {
+function Status({ name, info, provider, extra }) {
   const [test, setTest] = useState(null);
 
   async function runTest() {
@@ -18,7 +18,7 @@ function Status({ name, info, provider }) {
       <div className="status-line">
         <span className={`dot ${info.connected ? "on" : ""}`} />
         <strong>{name}</strong>
-        <span className="source">{info.connected ? `Found: ${info.source}` : "Not set up"}</span>
+        <span className="source">{info.connected ? info.source : "Not set up"}</span>
         {provider && <button onClick={runTest}>Test</button>}
       </div>
       {info.models && (
@@ -26,9 +26,14 @@ function Status({ name, info, provider }) {
           Fast: <code>{info.models.fast}</code> &nbsp; Smart: <code>{info.models.smart}</code>
         </div>
       )}
+      {extra}
       {test && <div className={`test ${test.ok ? "good" : test.ok === false ? "bad" : ""}`}>{test.message}</div>}
     </div>
   );
+}
+
+function Code({ children }) {
+  return <pre className="command">{children}</pre>;
 }
 
 export default function Settings({ onClose }) {
@@ -38,6 +43,10 @@ export default function Settings({ onClose }) {
   useEffect(() => {
     api.getSettings().then(setSettings).catch((err) => setError(err.message));
   }, []);
+
+  const missing = settings?.ollama.connected && settings.ollama.missing.length > 0 && (
+    <div className="test bad">Not downloaded yet: {settings.ollama.missing.join(", ")}</div>
+  );
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -52,44 +61,69 @@ export default function Settings({ onClose }) {
         {settings?.demo_mode && (
           <p className="notice">
             Buddy is in <strong>demo mode</strong>, so replies are made up and his voice is a beep.
-            Add your keys below and set <code>DEMO_MODE=false</code> to talk to him for real.
+            Set <code>DEMO_MODE=false</code> in <code>backend/.env</code> to talk to him for real.
           </p>
         )}
 
         {settings && (
           <>
+            <Status name="Local AI (free)" info={settings.ollama} provider="ollama" extra={missing} />
+            <Status name="Gemini (free)" info={settings.gemini} provider="gemini" />
             <Status name="Claude" info={settings.claude} provider="claude" />
             <Status name="ChatGPT" info={settings.openai} provider="openai" />
-            <Status name="Voice (speech to text and back)" info={settings.voice} />
+            <div className="status-card">
+              <div className="status-line">
+                <span className={`dot ${settings.voice.engine === "openai" || settings.voice.piper_installed ? "on" : "meh"}`} />
+                <strong>Voice</strong>
+                <span className="source">
+                  Talks with {settings.voice.voice}, listens with {settings.voice.listening}
+                </span>
+              </div>
+            </div>
           </>
         )}
 
-        <h3>How to connect Claude</h3>
+        <h3>Free: AI on your own computer (Ollama)</h3>
         <ol>
-          <li>Go to the <a href="https://console.anthropic.com" target="_blank" rel="noreferrer">Anthropic Console</a> and sign in.</li>
-          <li>Open <strong>API Keys</strong> and create a new key.</li>
-          <li>In the <code>backend</code> folder, copy <code>.env.example</code> to <code>.env</code> and paste it in as <code>ANTHROPIC_API_KEY=...</code></li>
-          <li>Restart the backend.</li>
+          <li>Download Ollama from <a href="https://ollama.com/download" target="_blank" rel="noreferrer">ollama.com</a> and open it.</li>
+          <li>Download the two models Buddy uses (a few GB, once):</li>
         </ol>
-        <p className="hint">
-          Already use Anthropic's <code>ant</code> command line tool? Run <code>ant auth login</code> once and Buddy
-          will pick it up, no key needed. A Claude Pro/Max subscription or a Claude Code login doesn't include
-          API access, the API is billed separately.
-        </p>
+        <Code>ollama pull {settings?.ollama.models.fast || "llama3.2:3b"}{"\n"}ollama pull {settings?.ollama.models.smart || "llama3.1:8b"}</Code>
+        <p className="hint">That's it, no account or key. It runs offline and nothing leaves your computer.</p>
 
-        <h3>How to connect ChatGPT (and Buddy's voice)</h3>
+        <h3>Free: Gemini (smarter, runs in the cloud)</h3>
         <ol>
-          <li>Go to <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">platform.openai.com/api-keys</a> and sign in.</li>
-          <li>Create a new secret key, and add some credit under Billing if you haven't already.</li>
-          <li>Add it to <code>backend/.env</code> as <code>OPENAI_API_KEY=...</code></li>
-          <li>Set <code>OPENAI_FAST_MODEL</code> and <code>OPENAI_SMART_MODEL</code> to the models you want, then restart the backend.</li>
+          <li>Go to <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">aistudio.google.com/apikey</a> and sign in with a Google account.</li>
+          <li>Create an API key. No card needed for the free tier.</li>
+          <li>Add it to <code>backend/.env</code> as <code>GEMINI_API_KEY=...</code> and restart the backend.</li>
         </ol>
-        <p className="hint">
-          Buddy uses OpenAI to hear you and to talk back, even when Claude is doing the thinking. A ChatGPT Plus
-          subscription or a Codex login doesn't include API credit.
-        </p>
+        <p className="hint">The free tier has daily limits, and Google may use free-tier conversations to improve their products.</p>
 
-        <p className="hint">Your keys stay in <code>backend/.env</code> on your computer. Buddy never shows or sends them anywhere else.</p>
+        <h3>Free: Buddy's voice (Piper)</h3>
+        <p>Without this he uses your browser's voice, which works but sounds more robotic. From the <code>backend</code> folder:</p>
+        <Code>python -m piper.download_voices {settings?.voice.piper_voice || "en_US-ryan-medium"} --download-dir voices</Code>
+        <p className="hint">About 60 MB, then restart the backend. Listening always uses your browser's speech recognition (Chrome, Edge or Safari).</p>
+
+        <details>
+          <summary>Paid options: Claude and ChatGPT</summary>
+          <p>
+            These use API keys, which are billed separately from a Claude Pro/Max or ChatGPT Plus subscription.
+            Subscriptions and logins like Claude Code or Codex can't be used by other apps.
+          </p>
+          <ol>
+            <li>
+              Claude: create a key in the <a href="https://console.anthropic.com" target="_blank" rel="noreferrer">Anthropic Console</a> and
+              add it as <code>ANTHROPIC_API_KEY=...</code> (or run <code>ant auth login</code> if you use Anthropic's CLI).
+            </li>
+            <li>
+              ChatGPT: create a key at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noreferrer">platform.openai.com/api-keys</a>,
+              add it as <code>OPENAI_API_KEY=...</code> and set <code>OPENAI_FAST_MODEL</code> / <code>OPENAI_SMART_MODEL</code>.
+            </li>
+            <li>For OpenAI's voice instead of the free one, also set <code>VOICE_ENGINE=openai</code>.</li>
+          </ol>
+        </details>
+
+        <p className="hint">Keys stay in <code>backend/.env</code> on your computer. Buddy never shows or sends them anywhere else.</p>
       </div>
     </div>
   );

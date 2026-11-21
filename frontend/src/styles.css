@@ -318,3 +318,18 @@ button, input, select { font: inherit; color: inherit; }
 .test { font-size: 13px; margin-top: 6px; }
 .test.good { color: var(--good); }
 .test.bad { color: var(--bad); }
+
+.dot.meh { background: #e0a526; }
+
+.command {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  overflow-x: auto;
+  user-select: all;
+}
+
+.modal details { margin-top: 20px; }
+.modal summary { cursor: pointer; color: var(--accent); }
