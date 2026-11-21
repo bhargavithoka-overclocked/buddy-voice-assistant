@@ -1,4 +1,12 @@
+import os
+from pathlib import Path
+
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# The desktop app keeps everything (chats, models, voice, keys) in one folder the
+# user picks, and passes it in as BUDDY_DATA_DIR. Keys then live in <folder>/buddy.env.
+DATA_DIR = os.environ.get("BUDDY_DATA_DIR")
 
 
 class Settings(BaseSettings):
@@ -42,5 +50,21 @@ class Settings(BaseSettings):
     # fake AI + voice, so the app runs without any keys
     demo_mode: bool = False
 
+    data_dir: str | None = None
+    # built frontend to serve at /, so the desktop app only needs one server
+    frontend_dir: str | None = None
 
-settings = Settings()
+    @model_validator(mode="after")
+    def keep_everything_in_the_data_folder(self):
+        if self.data_dir:
+            folder = Path(self.data_dir)
+            self.database_url = f"sqlite:///{folder / 'buddy.db'}"
+            self.voices_dir = str(folder / "voices")
+            self.whisper_dir = str(folder / "whisper")
+        return self
+
+
+settings = Settings(
+    data_dir=DATA_DIR,
+    _env_file=[".env", Path(DATA_DIR) / "buddy.env"] if DATA_DIR else ".env",
+)

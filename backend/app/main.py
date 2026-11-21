@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from . import models  # noqa: F401  (registers the tables)
 from .config import settings
@@ -33,3 +34,12 @@ app.include_router(voice_router)
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+def serve_frontend(app: FastAPI, folder: str):
+    # mounted last, so /api, /ws and /health still win
+    app.mount("/", StaticFiles(directory=folder, html=True), name="frontend")
+
+
+if settings.frontend_dir:
+    serve_frontend(app, settings.frontend_dir)
