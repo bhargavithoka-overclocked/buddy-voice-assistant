@@ -12,6 +12,7 @@ dist/
 
 # local stuff
 .env
+voices/
 *.db
 .DS_Store
 .idea/

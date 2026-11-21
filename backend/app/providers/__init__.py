@@ -5,6 +5,7 @@ from .fake import FakeChat, FakeSpeech
 from .gemini import GEMINI_ERRORS, get_gemini_client
 from .local import OLLAMA_ERRORS, get_ollama_client
 from .openai_chat import OpenAIChat
+from .piper_voice import FreeSpeech
 from .speech import OpenAISpeech
 
 PROVIDERS = ("ollama", "gemini", "claude", "openai")
@@ -27,5 +28,17 @@ def get_chat(provider: str, mode: str) -> ChatModel:
     raise ValueError(f"unknown provider {provider!r}")
 
 
+_free_speech = FreeSpeech()  # one copy, so the voice model is only loaded once
+
+
 def get_speech():
-    return FakeSpeech() if settings.demo_mode else OpenAISpeech()
+    if settings.demo_mode:
+        return FakeSpeech()
+    if settings.voice_engine == "openai":
+        return OpenAISpeech()
+    return _free_speech
+
+
+def listens_in_browser() -> bool:
+    """With the free setup the browser turns speech into text, not the server."""
+    return not settings.demo_mode and settings.voice_engine != "openai"

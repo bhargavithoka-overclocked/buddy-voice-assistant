@@ -16,7 +16,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from .database import SessionLocal
 from .memory import build_context, maybe_summarize
 from .models import Conversation, Message
-from .providers import MODES, PROVIDERS, ProviderError, get_chat, get_speech
+from .providers import MODES, PROVIDERS, ProviderError, get_chat, get_speech, listens_in_browser
 from .sentences import split_sentences
 from .suggestions import suggest_follow_ups
 
@@ -89,7 +89,9 @@ class VoiceSession:
                 db.add(conversation)
                 db.commit()
             self.conversation_id = conversation.id
-        await self.send("ready", conversation_id=self.conversation_id)
+        # tell the browser whether it should do the listening itself
+        listen = "browser" if listens_in_browser() else "server"
+        await self.send("ready", conversation_id=self.conversation_id, listen=listen)
 
     def update_settings(self, message: dict):
         if message.get("provider") in PROVIDERS:
