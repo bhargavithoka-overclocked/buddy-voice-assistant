@@ -1,12 +1,19 @@
 const { app, BrowserWindow, dialog, ipcMain, session, shell, systemPreferences } = require("electron");
 const path = require("path");
+const fs = require("fs");
 const { layout, readDataDir } = require("./paths");
 const services = require("./services");
+const { registerSetupHandlers } = require("./setup");
 
 const dataDir = readDataDir();
+const needsSetup = !dataDir || !fs.existsSync(layout(dataDir).setupDone);
 
-// keep Electron's own files (cache, local storage) inside the Buddy folder too
-if (dataDir) app.setPath("userData", layout(dataDir).electron);
+// keep Electron's own files (cache, local storage) inside the Buddy folder too.
+// Before setup there's no folder yet, so use a throwaway one.
+app.setPath("userData", needsSetup ? path.join(app.getPath("temp"), "buddy-setup") : layout(dataDir).electron);
+
+// the throwaway folder from setup isn't needed once Buddy has a real one
+if (!needsSetup) fs.rmSync(path.join(app.getPath("temp"), "buddy-setup"), { recursive: true, force: true });
 
 // Buddy talks as soon as he's woken by voice, without waiting for a click
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
@@ -38,14 +45,22 @@ function allowMicrophone() {
   if (process.platform === "darwin") systemPreferences.askForMediaAccess("microphone");
 }
 
+function openSetup() {
+  const window = new BrowserWindow({
+    width: 720,
+    height: 620,
+    resizable: false,
+    title: "Set up Buddy",
+    backgroundColor: "#15131a",
+    webPreferences: { preload: path.join(__dirname, "preload.js") },
+  });
+  registerSetupHandlers(window);
+  window.loadFile(path.join(__dirname, "setup", "index.html"));
+}
+
 async function launch() {
-  if (!dataDir) {
-    await dialog.showMessageBox({
-      type: "info",
-      message: "Buddy isn't set up yet.",
-      detail: "While developing, start it with BUDDY_DATA_DIR set to a Buddy folder.",
-    });
-    app.quit();
+  if (needsSetup) {
+    openSetup();
     return;
   }
   try {

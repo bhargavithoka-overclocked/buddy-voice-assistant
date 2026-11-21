@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'">
+  <title>Set up Buddy</title>
+  <link rel="stylesheet" href="setup.css">
+</head>
+<body>
+  <section class="step" id="welcome">
+    <div class="emoji">🦍</div>
+    <h1>Hi, I'm Buddy!</h1>
+    <p>I'm a voice assistant you can just talk to. Everything I need runs right here on your Mac, for free.</p>
+    <p class="muted">Setting me up takes a few minutes, mostly downloading.</p>
+    <button class="primary" data-next="folder">Let's go</button>
+  </section>
+
+  <section class="step" id="folder" hidden>
+    <h1>Where should I keep my things?</h1>
+    <p>All of it goes in one folder: our chats, my AI brain, my voice and settings. Nothing ends up anywhere else.</p>
+    <div class="folder-box">
+      <code id="folder-path"></code>
+      <button id="choose-folder">Choose...</button>
+    </div>
+    <p class="muted" id="folder-note">Deleting this folder later removes everything I downloaded.</p>
+    <div class="buttons">
+      <button data-next="welcome">Back</button>
+      <button class="primary" id="to-downloads">Next</button>
+    </div>
+  </section>
+
+  <section class="step" id="downloads" hidden>
+    <h1>Here's what I need to download</h1>
+    <p>Nothing is downloaded until you say so.</p>
+    <ul id="items"></ul>
+    <p class="summary" id="summary"></p>
+    <div class="buttons">
+      <button data-next="folder">Back</button>
+      <button class="primary" id="start-download">Download and set up</button>
+    </div>
+  </section>
+
+  <section class="step" id="progress" hidden>
+    <h1>Setting things up...</h1>
+    <p class="muted">The AI model is the big one, so that part takes the longest.</p>
+    <ul id="progress-items"></ul>
+    <p class="error" id="setup-error" hidden></p>
+    <div class="buttons">
+      <button class="primary" id="retry" hidden>Try again</button>
+    </div>
+  </section>
+
+  <section class="step" id="done" hidden>
+    <div class="emoji">🎉</div>
+    <h1>All set!</h1>
+    <p>Say <strong>"Hey Buddy"</strong> or tap <strong>Hi</strong> to start talking.</p>
+    <p class="muted">Want me to be smarter? You can add a free Gemini key later in Settings.</p>
+    <button class="primary" id="finish">Start Buddy</button>
+  </section>
+
+  <script src="setup.js"></script>
+</body>
+</html>
