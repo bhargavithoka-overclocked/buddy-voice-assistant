@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { socketUrl } from "../api.js";
+import { BrowserListener } from "../audio/browserListener.js";
 import { Microphone } from "../audio/microphone.js";
 import { SpeechPlayer } from "../audio/player.js";
 import { toBase64 } from "../audio/wav.js";
 
 const NAP_AFTER_MS = 60_000; // go back to sleep after a minute of nobody talking
 const TAP_TO_HEAR = "Tap anywhere on the page so you can hear Buddy.";
+const GIVE_UP_LISTENING_MS = 2500; // heard a noise but no words came through
 
 /**
  * Everything about the live conversation: the WebSocket, the mic, Buddy's
@@ -24,6 +26,10 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
   const ws = useRef(null);
   const mic = useRef(null);
   const player = useRef(null);
+  // "browser": the browser turns speech into text (free setup). "server": we send the audio.
+  const listenMode = useRef("server");
+  const listener = useRef(null);
+  const quietTimer = useRef(null);
   const stateRef = useRef(state);
   const napTimer = useRef(null);
   const settingsRef = useRef({ conversationId, provider, mode });
@@ -38,6 +44,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     if (next === "idle") {
       napTimer.current = setTimeout(() => {
         mic.current?.setListening(false);
+        listener.current?.stop();
         changeState("asleep");
       }, NAP_AFTER_MS);
     }
@@ -56,6 +63,14 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
       return [...list, { role: "assistant", content: text, live: true }];
     });
 
+  // live captions of what the user is saying (free setup only)
+  const showUserText = (text, live) =>
+    setMessages((list) => {
+      const last = list[list.length - 1];
+      if (last?.role === "user" && last.live) return [...list.slice(0, -1), { role: "user", content: text, live }];
+      return [...list, { role: "user", content: text, live }];
+    });
+
   const finishLastReply = (extra = {}) =>
     setMessages((list) =>
       list.map((m, i) => (i === list.length - 1 && m.live ? { ...m, live: false, ...extra } : m))
@@ -67,6 +82,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     mic.current && (mic.current.strict = false);
     send({ type: "interrupt" });
     finishLastReply({ interrupted: true });
+    if (listenMode.current === "browser" && mic.current?.listening) listener.current?.start();
   }, [send]);
 
   // --- server messages ---
@@ -74,6 +90,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     (message) => {
       switch (message.type) {
         case "ready":
+          listenMode.current = message.listen || "server";
           if (message.conversation_id !== settingsRef.current.conversationId) {
             callbacks.current.onConversation?.(message.conversation_id);
           }
@@ -135,14 +152,34 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     player.current = new SpeechPlayer({
       onSentence: (text) => {
         if (mic.current) mic.current.strict = true;
+        // stop the browser from transcribing Buddy's own voice; the mic still catches interruptions
+        listener.current?.stop();
         addToLastReply(text);
         changeState("speaking");
       },
       onFinished: () => {
         if (mic.current) mic.current.strict = false;
         finishLastReply();
-        changeState(mic.current?.listening ? "idle" : "asleep");
+        const awake = mic.current?.listening;
+        if (awake && listenMode.current === "browser") listener.current?.start();
+        changeState(awake ? "idle" : "asleep");
       },
+    });
+
+    listener.current = new BrowserListener({
+      onInterim: (text) => {
+        clearTimeout(quietTimer.current);
+        showUserText(text, true);
+        if (stateRef.current !== "thinking") changeState("listening");
+      },
+      onFinal: (text) => {
+        clearTimeout(quietTimer.current);
+        if (stateRef.current === "speaking" || stateRef.current === "thinking") interrupt();
+        showUserText(text, false);
+        send({ type: "text", text });
+        changeState("thinking");
+      },
+      onError: setError,
     });
 
     connect();
@@ -153,8 +190,9 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
       ws.current?.close();
       player.current?.stop();
       mic.current?.stop();
+      listener.current?.stop();
     };
-  }, [handleServerMessage, changeState]);
+  }, [handleServerMessage, changeState, interrupt, send]);
 
   // switching chats: tell the server which conversation we're in now
   useEffect(() => {
@@ -178,6 +216,14 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
         changeState("listening");
       },
       onSpeechEnd: (wav) => {
+        if (listenMode.current === "browser") {
+          // the browser sends the words itself; if none come, it was probably just noise
+          clearTimeout(quietTimer.current);
+          quietTimer.current = setTimeout(() => {
+            if (stateRef.current === "listening") changeState("idle");
+          }, GIVE_UP_LISTENING_MS);
+          return;
+        }
         send({ type: "audio", mime: "audio/wav", data: toBase64(wav) });
         changeState("thinking");
       },
@@ -208,6 +254,8 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     setWaving(true);
     setTimeout(() => setWaving(false), 2500);
     if (await startMic()) mic.current.setListening(!muted);
+    // give the "Hey Buddy" listener a moment to let go of the mic first
+    if (listenMode.current === "browser" && !muted) setTimeout(() => listener.current?.start(), 400);
     setMessages((list) => [...list, { role: "user", content: "Hey Buddy!" }]);
     send({ type: "text", text: "Hey Buddy!" });
     changeState("thinking");
@@ -228,7 +276,10 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
 
   const toggleMute = useCallback(() => {
     setMuted((wasMuted) => {
-      mic.current?.setListening(wasMuted && stateRef.current !== "asleep");
+      const listening = wasMuted && stateRef.current !== "asleep";
+      mic.current?.setListening(listening);
+      if (listening && listenMode.current === "browser") listener.current?.start();
+      else listener.current?.stop();
       return !wasMuted;
     });
   }, []);
