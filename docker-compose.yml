@@ -6,6 +6,10 @@ services:
         required: false
     environment:
       ALLOWED_ORIGINS: http://localhost:8080
+      # Ollama runs on your computer, not in the container
+      OLLAMA_URL: http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - buddy-data:/data
 
