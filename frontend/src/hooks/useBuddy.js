@@ -89,7 +89,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
           changeState("thinking");
           break;
         case "speech":
-          player.current.add(message.index, message.audio, message.text);
+          player.current.add(message.index, message.audio, message.text, message.format);
           break;
         case "done":
           setLatency(message.latency);

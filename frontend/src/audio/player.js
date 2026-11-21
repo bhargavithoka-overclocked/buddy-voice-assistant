@@ -1,7 +1,18 @@
+// a deeper-sounding voice suits a gorilla, if the browser has one
+function pickBrowserVoice() {
+  const voices = speechSynthesis.getVoices().filter((v) => v.lang.startsWith("en"));
+  return (
+    voices.find((v) => /daniel|alex|aaron|arthur|male/i.test(v.name)) || voices.find((v) => v.default) || voices[0] || null
+  );
+}
+
 /**
  * Plays Buddy's reply one sentence at a time, in order, even if the
  * audio for sentence 3 arrives before sentence 2. Also measures how loud
  * he is right now, which drives his mouth.
+ *
+ * Sentences come either as audio (from Piper or OpenAI) or as plain text
+ * with format "browser", which the browser's own voice reads out.
  */
 export class SpeechPlayer {
   constructor({ onSentence, onFinished }) {
@@ -35,11 +46,14 @@ export class SpeechPlayer {
     return this.playing !== null;
   }
 
-  async add(index, base64, text) {
+  async add(index, base64, text, format = "wav") {
     this.ensureContext();
     const generation = this.generation;
-    const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
-    const buffer = await this.context.decodeAudioData(bytes.buffer);
+    let buffer = null;
+    if (format !== "browser") {
+      const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+      buffer = await this.context.decodeAudioData(bytes.buffer);
+    }
     if (generation !== this.generation) return; // stopped while decoding
     this.decoded.set(index, { buffer, text });
     this.playNext();
@@ -57,18 +71,50 @@ export class SpeechPlayer {
     this.decoded.delete(this.nextIndex);
     this.nextIndex += 1;
 
+    if (buffer) this.playBuffer(buffer);
+    else this.speakWithBrowser(text);
+    this.onSentence?.(text);
+  }
+
+  sentenceEnded(current) {
+    if (this.playing !== current) return;
+    this.playing = null;
+    this.playNext();
+    this.checkFinished();
+  }
+
+  playBuffer(buffer) {
     const source = this.context.createBufferSource();
     source.buffer = buffer;
     source.connect(this.analyser);
-    source.onended = () => {
-      if (this.playing !== source) return;
-      this.playing = null;
-      this.playNext();
-      this.checkFinished();
+    const current = {
+      stop: () => {
+        source.onended = null;
+        source.stop();
+      },
     };
-    this.playing = source;
+    source.onended = () => this.sentenceEnded(current);
+    this.playing = current;
     source.start();
-    this.onSentence?.(text);
+  }
+
+  speakWithBrowser(text) {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.voice = pickBrowserVoice();
+    utterance.pitch = 0.8;
+    // there's no audio to measure, so make his mouth move on each word instead
+    utterance.onboundary = () => (this.pulse = 1);
+    const current = {
+      browser: true,
+      stop: () => {
+        utterance.onend = utterance.onerror = null;
+        speechSynthesis.cancel();
+      },
+    };
+    utterance.onend = utterance.onerror = () => this.sentenceEnded(current);
+    this.playing = current;
+    this.pulse = 0.6;
+    speechSynthesis.speak(utterance);
   }
 
   checkFinished() {
@@ -80,16 +126,17 @@ export class SpeechPlayer {
   }
 
   stop() {
-    const source = this.playing;
+    const current = this.playing;
     this.reset();
-    if (source) {
-      source.onended = null;
-      source.stop();
-    }
+    current?.stop();
   }
 
   get level() {
     if (!this.playing) return 0;
+    if (this.playing.browser) {
+      this.pulse *= 0.9;
+      return 0.2 + this.pulse * 0.6 * (0.7 + 0.3 * Math.sin(performance.now() / 60));
+    }
     this.analyser.getFloatTimeDomainData(this.samples);
     let sum = 0;
     for (const s of this.samples) sum += s * s;
