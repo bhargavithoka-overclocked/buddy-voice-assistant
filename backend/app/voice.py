@@ -12,7 +12,7 @@ import base64
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from .database import SessionLocal
-from .memory import build_context
+from .memory import build_context, maybe_summarize
 from .models import Conversation, Message
 from .providers import MODES, PROVIDERS, ProviderError, get_chat, get_speech
 from .sentences import split_sentences
@@ -117,12 +117,19 @@ class VoiceSession:
             await self.speak_reply(get_chat(self.provider, self.mode).stream(system, history), spoken)
             self.save_reply(" ".join(spoken))
             await self.send("done")
+            await self.tidy_up_memory()
         except ProviderError as e:
             await self.send("error", message=str(e))
         except asyncio.CancelledError:
             # keep what Buddy managed to say, so the conversation still makes sense
             self.save_reply(" ".join(spoken), interrupted=True)
             raise
+
+    async def tidy_up_memory(self):
+        with SessionLocal() as db:
+            conversation = db.get(Conversation, self.conversation_id)
+            # the fast model is plenty for summaries
+            await maybe_summarize(db, conversation, get_chat(self.provider, "fast"))
 
     async def speak_reply(self, chunks, spoken: list[str]):
         """

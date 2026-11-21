@@ -11,6 +11,9 @@ class Conversation(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     title: Mapped[str] = mapped_column(String(120), default="New chat")
+    # long chats get their older messages squashed into a summary
+    summary: Mapped[str | None] = mapped_column(Text)
+    summarized_upto: Mapped[int] = mapped_column(default=0)  # last message id the summary covers
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
