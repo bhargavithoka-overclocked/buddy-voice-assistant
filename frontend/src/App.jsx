@@ -27,7 +27,7 @@ export default function App() {
       </aside>
 
       <main className="stage">
-        <Buddy />
+        <Buddy state={buddy.state} waving={buddy.waving} getLevel={buddy.getLevel} />
         <p className="status">{STATUS[buddy.state]}</p>
         {buddy.state === "asleep" && (
           <button className="hi-button" onClick={buddy.wake}>Hi 👋</button>

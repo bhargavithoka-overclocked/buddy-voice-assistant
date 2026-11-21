@@ -64,6 +64,24 @@ button, input, select { font: inherit; color: inherit; }
   width: min(380px, 70vw);
   height: auto;
   flex-shrink: 0;
+  overflow: visible;
+}
+
+/* the thinking dots and sleepy z's move on their own, the rest is animated in Buddy.jsx */
+.buddy .thought .dot { animation: dot 1.2s ease-in-out infinite; }
+.buddy .thought .dot:nth-of-type(5) { animation-delay: 0.2s; }
+.buddy .thought .dot:nth-of-type(6) { animation-delay: 0.4s; }
+@keyframes dot {
+  0%, 60%, 100% { transform: translateY(0); }
+  30% { transform: translateY(-5px); }
+}
+
+.buddy .zzz text { animation: float 3s ease-in-out infinite; }
+.buddy .zzz text:nth-child(2) { animation-delay: 0.5s; }
+.buddy .zzz text:nth-child(3) { animation-delay: 1s; }
+@keyframes float {
+  0%, 100% { transform: translateY(0); opacity: 0.4; }
+  50% { transform: translateY(-6px); opacity: 1; }
 }
 
 .hi-button {
