@@ -52,7 +52,7 @@ class VoiceSession:
     def __init__(self, websocket: WebSocket):
         self.ws = websocket
         self.conversation_id: int | None = None
-        self.provider = "claude"
+        self.provider = "ollama"
         self.mode = "fast"
         self.turn: asyncio.Task | None = None
 

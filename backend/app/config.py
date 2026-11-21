@@ -4,6 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
+    # Ollama, free models that run on this computer (the default)
+    ollama_url: str = "http://localhost:11434"
+    ollama_fast_model: str = "llama3.2:3b"
+    ollama_smart_model: str = "llama3.1:8b"
+
     # Claude. The key is optional here: the Anthropic SDK also picks up
     # ANTHROPIC_API_KEY from the environment or an `ant auth login` profile.
     anthropic_api_key: str | None = None

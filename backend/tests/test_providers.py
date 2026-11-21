@@ -22,6 +22,8 @@ def test_picks_model_by_mode(monkeypatch):
     assert get_chat("claude", "smart").model == providers.settings.claude_smart_model
     assert get_chat("openai", "smart").model == providers.settings.openai_smart_model
     assert isinstance(get_chat("claude", "smart"), ClaudeChat)
+    assert get_chat("ollama", "fast").model == "llama3.2:3b"
+    assert get_chat("ollama", "smart").name == "Ollama"
     with pytest.raises(ValueError):
         get_chat("gemini", "fast")
 
@@ -41,3 +43,18 @@ def test_beep_speech_is_a_valid_wav():
         assert wav.getnchannels() == 1
         assert wav.getframerate() == 16000
         assert wav.getnframes() == 16000  # 4 words * 0.25s
+
+
+def test_ollama_not_running(monkeypatch):
+    from app import providers
+    from app.providers import local
+    from app.providers.base import ProviderError
+
+    monkeypatch.setattr(providers.settings, "demo_mode", False)
+    monkeypatch.setattr(providers.settings, "ollama_url", "http://127.0.0.1:9")  # nothing listens here
+    monkeypatch.setattr(local, "_client", None)
+
+    chat = get_chat("ollama", "fast")
+    with pytest.raises(ProviderError, match="can't reach Ollama"):
+        asyncio.run(collect(chat.stream("hi", [{"role": "user", "content": "hi"}])))
+    monkeypatch.setattr(local, "_client", None)
