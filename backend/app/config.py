@@ -24,8 +24,12 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_fast_model: str = "your-gpt-5-luna-model-id"
     openai_smart_model: str = "your-sol-model-id"
-    # "free": Piper voice + the browser listens. "openai": OpenAI does both (needs a key)
+    # "free": Piper voice + the browser listens (web version)
+    # "local": Piper voice + Whisper listens, all on this computer (desktop app)
+    # "openai": OpenAI does both (needs a key)
     voice_engine: str = "free"
+    whisper_model: str = "base.en"
+    whisper_dir: str = "whisper"
     piper_voice: str = "en_US-ryan-medium"
     voices_dir: str = "voices"
     transcribe_model: str = "gpt-4o-mini-transcribe"

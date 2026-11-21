@@ -73,9 +73,11 @@ export default function App() {
     return () => listener.stop();
   }, []);
   useEffect(() => {
-    if (buddy.state === "asleep") wakeWord.current.start();
+    // the browser listens for "Hey Buddy" itself only in the free web setup;
+    // otherwise (desktop app, OpenAI, demo) the mic + server do it
+    if (buddy.state === "asleep" && buddy.listenWhere === "browser") wakeWord.current.start();
     else wakeWord.current.stop();
-  }, [buddy.state]);
+  }, [buddy.state, buddy.listenWhere]);
 
   // load the history whenever we switch to a chat
   useEffect(() => {
@@ -128,7 +130,9 @@ export default function App() {
           micOn={buddy.state !== "asleep"}
         />
         <Buddy state={buddy.state} waving={buddy.waving} getLevel={buddy.getLevel} />
-        <p className="status">{STATUS[buddy.state]}</p>
+        <p className="status">
+          {buddy.state === "asleep" && buddy.listenWhere === "server" ? 'Say "Hey Buddy" or tap Hi' : STATUS[buddy.state]}
+        </p>
         {buddy.state === "asleep" && (
           <button className="hi-button" onClick={() => buddy.wake()}>Hi 👋</button>
         )}

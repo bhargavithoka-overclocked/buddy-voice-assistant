@@ -7,6 +7,7 @@ from .local import OLLAMA_ERRORS, get_ollama_client
 from .openai_chat import OpenAIChat
 from .piper_voice import FreeSpeech
 from .speech import OpenAISpeech
+from .whisper_speech import LocalSpeech
 
 PROVIDERS = ("ollama", "gemini", "claude", "openai")
 MODES = ("fast", "smart")
@@ -28,7 +29,9 @@ def get_chat(provider: str, mode: str) -> ChatModel:
     raise ValueError(f"unknown provider {provider!r}")
 
 
-_free_speech = FreeSpeech()  # one copy, so the voice model is only loaded once
+# one copy of each, so the models are only loaded once
+_free_speech = FreeSpeech()
+_local_speech = LocalSpeech()
 
 
 def get_speech():
@@ -36,9 +39,11 @@ def get_speech():
         return FakeSpeech()
     if settings.voice_engine == "openai":
         return OpenAISpeech()
+    if settings.voice_engine == "local":
+        return _local_speech
     return _free_speech
 
 
 def listens_in_browser() -> bool:
     """With the free setup the browser turns speech into text, not the server."""
-    return not settings.demo_mode and settings.voice_engine != "openai"
+    return not settings.demo_mode and settings.voice_engine == "free"

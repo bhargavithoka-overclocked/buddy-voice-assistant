@@ -8,6 +8,7 @@ import { toBase64 } from "../audio/wav.js";
 const NAP_AFTER_MS = 60_000; // go back to sleep after a minute of nobody talking
 const TAP_TO_HEAR = "Tap anywhere on the page so you can hear Buddy.";
 const GIVE_UP_LISTENING_MS = 2500; // heard a noise but no words came through
+const LONGEST_WAKE_CHECK_BYTES = 16000 * 2 * 4; // "Hey Buddy" fits easily in 4 seconds
 
 /**
  * Everything about the live conversation: the WebSocket, the mic, Buddy's
@@ -22,6 +23,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
   const [error, setError] = useState(null);
   const [waving, setWaving] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [listenWhere, setListenWhere] = useState("server");
 
   const ws = useRef(null);
   const mic = useRef(null);
@@ -32,6 +34,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
   const quietTimer = useRef(null);
   const stateRef = useRef(state);
   const napTimer = useRef(null);
+  const wakeRef = useRef(null);
   const settingsRef = useRef({ conversationId, provider, mode });
   settingsRef.current = { conversationId, provider, mode };
   const callbacks = useRef({ onConversation, onTitle });
@@ -91,6 +94,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
       switch (message.type) {
         case "ready":
           listenMode.current = message.listen || "server";
+          setListenWhere(listenMode.current);
           if (message.conversation_id !== settingsRef.current.conversationId) {
             callbacks.current.onConversation?.(message.conversation_id);
           }
@@ -114,6 +118,9 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
           break;
         case "suggestions":
           setSuggestions(message.items);
+          break;
+        case "wake":
+          if (stateRef.current === "asleep") wakeRef.current?.({ byVoice: true });
           break;
         case "nothing_heard":
           changeState("idle");
@@ -212,10 +219,16 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     if (mic.current) return true;
     const microphone = new Microphone({
       onSpeechStart: () => {
+        if (stateRef.current === "asleep") return; // just checking for "Hey Buddy"
         if (stateRef.current === "speaking" || stateRef.current === "thinking") interrupt();
         changeState("listening");
       },
       onSpeechEnd: (wav) => {
+        if (stateRef.current === "asleep") {
+          // asleep: only ask the server whether this was "Hey Buddy"
+          if (wav.byteLength <= LONGEST_WAKE_CHECK_BYTES) send({ type: "wake_check", data: toBase64(wav) });
+          return;
+        }
         if (listenMode.current === "browser") {
           // the browser sends the words itself; if none come, it was probably just noise
           clearTimeout(quietTimer.current);
@@ -261,6 +274,14 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     changeState("thinking");
   }, [changeState, muted, send, startMic]);
 
+  wakeRef.current = wake;
+
+  // when the server does the listening (the desktop app), it also listens for "Hey Buddy"
+  useEffect(() => {
+    if (state !== "asleep" || listenWhere !== "server" || muted) return;
+    startMic().then((ok) => ok && mic.current.setListening(true));
+  }, [state, listenWhere, muted, startMic]);
+
   const sendText = useCallback(
     (text) => {
       if (!text.trim()) return;
@@ -292,7 +313,7 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
   }, []);
 
   return {
-    state, messages, setMessages, suggestions, latency, error, setError,
+    state, listenWhere, messages, setMessages, suggestions, latency, error, setError,
     waving, muted, wake, sendText, interrupt, toggleMute, getLevel, unlockAudio,
   };
 }

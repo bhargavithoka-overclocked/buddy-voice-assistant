@@ -2,9 +2,9 @@
 The live voice conversation. The browser and the server talk over one
 WebSocket using small JSON messages:
 
-  browser -> server   hello, settings, audio, text, interrupt
+  browser -> server   hello, settings, audio, text, interrupt, wake_check
   server -> browser   ready, title, transcript, thinking, speech, done, suggestions,
-                      interrupted, error
+                      interrupted, wake, not_wake, error
 """
 
 import asyncio
@@ -19,6 +19,7 @@ from .models import Conversation, Message
 from .providers import MODES, PROVIDERS, ProviderError, get_chat, get_speech, listens_in_browser
 from .sentences import split_sentences
 from .suggestions import suggest_follow_ups
+from .wake import is_wake_phrase
 
 router = APIRouter()
 
@@ -72,6 +73,8 @@ class VoiceSession:
         elif kind == "audio":
             audio = base64.b64decode(message.get("data", ""))
             await self.start_turn(audio=audio, mime=message.get("mime", "audio/wav"))
+        elif kind == "wake_check":
+            await self.wake_check(base64.b64decode(message.get("data", "")))
         elif kind == "interrupt":
             if await self.stop_turn():
                 await self.send("interrupted")
@@ -92,6 +95,15 @@ class VoiceSession:
         # tell the browser whether it should do the listening itself
         listen = "browser" if listens_in_browser() else "server"
         await self.send("ready", conversation_id=self.conversation_id, listen=listen)
+
+    async def wake_check(self, audio: bytes):
+        """While Buddy is asleep the app sends short bits of speech to check for "Hey Buddy"."""
+        try:
+            heard = await get_speech().transcribe(audio, "audio/wav")
+        except ProviderError as e:
+            await self.send("error", message=str(e))
+            return
+        await self.send("wake" if is_wake_phrase(heard) else "not_wake", heard=heard)
 
     def update_settings(self, message: dict):
         if message.get("provider") in PROVIDERS:
