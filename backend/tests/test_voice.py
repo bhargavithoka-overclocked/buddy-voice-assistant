@@ -67,3 +67,32 @@ def test_must_say_hello_first(client):
     with client.websocket_connect("/ws") as ws:
         ws.send_json({"type": "text", "text": "hi"})
         assert ws.receive_json()["type"] == "error"
+
+
+def test_interrupt_stops_the_reply(client, monkeypatch):
+    from app import voice
+    from app.providers.fake import FakeChat
+
+    # a slow talker, so there's time to cut him off
+    monkeypatch.setattr(voice, "get_chat", lambda provider, mode: FakeChat(delay=0.15))
+
+    with client.websocket_connect("/ws") as ws:
+        conversation_id = start(ws)["conversation_id"]
+        ws.send_json({"type": "text", "text": "Tell me a long story please"})
+        first_sentence = receive_until(ws, "speech")[-1]["text"]
+        ws.send_json({"type": "interrupt"})
+        assert receive_until(ws, "interrupted")[-1] == {"type": "interrupted"}
+
+    saved = client.get(f"/api/conversations/{conversation_id}").json()["messages"]
+    assert saved[-1]["role"] == "assistant"
+    assert saved[-1]["interrupted"] is True
+    assert saved[-1]["content"].startswith(first_sentence)
+
+
+def test_interrupt_with_nothing_playing(client):
+    with client.websocket_connect("/ws") as ws:
+        start(ws)
+        ws.send_json({"type": "interrupt"})
+        ws.send_json({"type": "text", "text": " "})
+        # no "interrupted" message, straight to the next reply
+        assert ws.receive_json() == {"type": "nothing_heard"}

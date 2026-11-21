@@ -18,11 +18,16 @@ def build_context(db: Session, conversation: Conversation) -> tuple[str, list[di
     """The system prompt and the message history to send with the next request."""
     messages = []
     for message in conversation.messages:
+        content = message.content
+        if message.interrupted:
+            # so the model knows it didn't get to finish
+            content += " [the user interrupted you here]"
+
         # the APIs want user/assistant turns to alternate, so merge any repeats
         if messages and messages[-1]["role"] == message.role:
-            messages[-1]["content"] += "\n" + message.content
+            messages[-1]["content"] += "\n" + content
         else:
-            messages.append({"role": message.role, "content": message.content})
+            messages.append({"role": message.role, "content": content})
 
     # and the history has to start with the user
     while messages and messages[0]["role"] != "user":

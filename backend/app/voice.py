@@ -2,8 +2,8 @@
 The live voice conversation. The browser and the server talk over one
 WebSocket using small JSON messages:
 
-  browser -> server   hello, settings, audio, text
-  server -> browser   ready, transcript, thinking, speech, done, error
+  browser -> server   hello, settings, audio, text, interrupt
+  server -> browser   ready, transcript, thinking, speech, done, interrupted, error
 """
 
 import asyncio
@@ -47,10 +47,13 @@ class VoiceSession:
         elif self.conversation_id is None:
             await self.send("error", message="Say hello first.")
         elif kind == "text":
-            self.start_turn(text=message.get("text", ""))
+            await self.start_turn(text=message.get("text", ""))
         elif kind == "audio":
             audio = base64.b64decode(message.get("data", ""))
-            self.start_turn(audio=audio, mime=message.get("mime", "audio/wav"))
+            await self.start_turn(audio=audio, mime=message.get("mime", "audio/wav"))
+        elif kind == "interrupt":
+            if await self.stop_turn():
+                await self.send("interrupted")
         else:
             await self.send("error", message=f"Unknown message type: {kind}")
 
@@ -73,10 +76,24 @@ class VoiceSession:
         if message.get("mode") in MODES:
             self.mode = message["mode"]
 
-    def start_turn(self, text: str = "", audio: bytes = b"", mime: str = "audio/wav"):
+    async def start_turn(self, text: str = "", audio: bytes = b"", mime: str = "audio/wav"):
+        # talking over Buddy cuts him off
+        await self.stop_turn()
         self.turn = asyncio.create_task(self.run_turn(text, audio, mime))
 
+    async def stop_turn(self) -> bool:
+        """Cancel the reply in progress. Returns True if there was one."""
+        if self.turn is None or self.turn.done():
+            return False
+        self.turn.cancel()
+        try:
+            await self.turn
+        except asyncio.CancelledError:
+            pass
+        return True
+
     async def run_turn(self, text: str, audio: bytes, mime: str):
+        spoken = []
         try:
             if audio:
                 text = await get_speech().transcribe(audio, mime)
@@ -97,12 +114,15 @@ class VoiceSession:
                 system, history = build_context(db, conversation)
 
             await self.send("thinking")
-            spoken = []
             await self.speak_reply(get_chat(self.provider, self.mode).stream(system, history), spoken)
             self.save_reply(" ".join(spoken))
             await self.send("done")
         except ProviderError as e:
             await self.send("error", message=str(e))
+        except asyncio.CancelledError:
+            # keep what Buddy managed to say, so the conversation still makes sense
+            self.save_reply(" ".join(spoken), interrupted=True)
+            raise
 
     async def speak_reply(self, chunks, spoken: list[str]):
         """
@@ -141,11 +161,13 @@ class VoiceSession:
                 if item := queue.get_nowait():
                     item[1].cancel()
 
-    def save_reply(self, text: str):
+    def save_reply(self, text: str, interrupted: bool = False):
         if not text:
             return
         with SessionLocal() as db:
-            db.add(Message(conversation_id=self.conversation_id, role="assistant", content=text))
+            db.add(Message(
+                conversation_id=self.conversation_id, role="assistant", content=text, interrupted=interrupted
+            ))
             db.commit()
 
     async def close(self):
