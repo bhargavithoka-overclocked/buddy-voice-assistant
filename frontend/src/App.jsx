@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "./api.js";
+import { WakeWordListener, wakeWordSupported } from "./audio/wakeWord.js";
 import Buddy from "./components/Buddy.jsx";
 import ChatLog from "./components/ChatLog.jsx";
 import Settings from "./components/Settings.jsx";
@@ -10,7 +11,7 @@ import TypeBox from "./components/TypeBox.jsx";
 import { useBuddy } from "./hooks/useBuddy.js";
 
 const STATUS = {
-  asleep: "Tap Hi to start",
+  asleep: wakeWordSupported ? 'Say "Hey Buddy" or tap Hi' : "Tap Hi to start",
   idle: "I'm listening...",
   listening: "Listening...",
   thinking: "Thinking...",
@@ -62,6 +63,20 @@ export default function App() {
 
   useEffect(refreshList, [refreshList]);
 
+  // listen for "Hey Buddy" whenever he's asleep
+  const wakeWord = useRef(null);
+  const wakeRef = useRef(buddy.wake);
+  wakeRef.current = buddy.wake;
+  useEffect(() => {
+    const listener = new WakeWordListener(() => wakeRef.current({ byVoice: true }));
+    wakeWord.current = listener;
+    return () => listener.stop();
+  }, []);
+  useEffect(() => {
+    if (buddy.state === "asleep") wakeWord.current.start();
+    else wakeWord.current.stop();
+  }, [buddy.state]);
+
   // load the history whenever we switch to a chat
   useEffect(() => {
     if (!conversationId) return;
@@ -89,7 +104,8 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    // browsers only let a page play sound after it's been clicked at least once
+    <div className="app" onPointerDown={buddy.unlockAudio}>
       <Sidebar
         // chats only get a real title once something's been said, so skip the empty ones
         conversations={conversations.filter((c) => c.title !== "New chat" || c.id === conversationId)}
@@ -114,7 +130,7 @@ export default function App() {
         <Buddy state={buddy.state} waving={buddy.waving} getLevel={buddy.getLevel} />
         <p className="status">{STATUS[buddy.state]}</p>
         {buddy.state === "asleep" && (
-          <button className="hi-button" onClick={buddy.wake}>Hi 👋</button>
+          <button className="hi-button" onClick={() => buddy.wake()}>Hi 👋</button>
         )}
         {buddy.error && <p className="error">{buddy.error}</p>}
         <ChatLog messages={buddy.messages} />

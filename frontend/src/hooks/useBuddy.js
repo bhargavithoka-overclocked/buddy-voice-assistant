@@ -5,6 +5,7 @@ import { SpeechPlayer } from "../audio/player.js";
 import { toBase64 } from "../audio/wav.js";
 
 const NAP_AFTER_MS = 60_000; // go back to sleep after a minute of nobody talking
+const TAP_TO_HEAR = "Tap anywhere on the page so you can hear Buddy.";
 
 /**
  * Everything about the live conversation: the WebSocket, the mic, Buddy's
@@ -191,10 +192,19 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
     }
   }, [changeState, interrupt, send]);
 
+  const unlockAudio = useCallback(() => {
+    player.current?.ensureContext();
+    setError((current) => (current === TAP_TO_HEAR ? null : current));
+  }, []);
+
   // "Hey Buddy" or the Hi button
-  const wake = useCallback(async () => {
+  const wake = useCallback(async ({ byVoice = false } = {}) => {
     player.current?.ensureContext();
     setError(null);
+    if (byVoice && player.current?.context?.state === "suspended") {
+      // woken by voice before the page was ever clicked: he can hear you but can't talk yet
+      setError(TAP_TO_HEAR);
+    }
     setWaving(true);
     setTimeout(() => setWaving(false), 2500);
     if (await startMic()) mic.current.setListening(!muted);
@@ -232,6 +242,6 @@ export function useBuddy({ conversationId, provider, mode, onConversation, onTit
 
   return {
     state, messages, setMessages, suggestions, latency, error, setError,
-    waving, muted, wake, sendText, interrupt, toggleMute, getLevel,
+    waving, muted, wake, sendText, interrupt, toggleMute, getLevel, unlockAudio,
   };
 }
