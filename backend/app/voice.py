@@ -141,6 +141,7 @@ class VoiceSession:
             await self.speak_reply(timed(chunks, timer), spoken, timer)
             reply = " ".join(spoken)
             self.save_reply(reply)
+            spoken = []  # saved now, so an interrupt from here on mustn't save it again
             timer.mark("total_ms")
             await self.send("done", latency=timer.marks)
 

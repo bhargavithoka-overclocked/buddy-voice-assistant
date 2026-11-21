@@ -136,3 +136,26 @@ def test_unknown_settings_are_ignored(client):
         start(ws, provider="gemini", mode="turbo")
         ws.send_json({"type": "text", "text": "hi"})
         assert receive_until(ws, "done")[-1]["type"] == "done"
+
+
+def test_interrupt_after_reply_doesnt_save_it_twice(client, monkeypatch):
+    import asyncio
+
+    from app import voice
+
+    async def slow_suggestions(chat, history):
+        await asyncio.sleep(1)
+        return []
+
+    monkeypatch.setattr(voice, "suggest_follow_ups", slow_suggestions)
+
+    with client.websocket_connect("/ws") as ws:
+        conversation_id = start(ws)["conversation_id"]
+        ws.send_json({"type": "text", "text": "hi"})
+        receive_until(ws, "done")
+        # Buddy has finished talking, but the suggestions are still being worked out
+        ws.send_json({"type": "interrupt"})
+        receive_until(ws, "interrupted")
+
+    saved = client.get(f"/api/conversations/{conversation_id}").json()["messages"]
+    assert [(m["role"], m["interrupted"]) for m in saved] == [("user", False), ("assistant", False)]
