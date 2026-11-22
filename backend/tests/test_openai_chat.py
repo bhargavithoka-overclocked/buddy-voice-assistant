@@ -71,3 +71,14 @@ def test_missing_model_names_the_model():
 
     with pytest.raises(ProviderError, match="ollama pull llama3.2:3b"):
         collect(chat)
+
+
+def test_a_wrong_key_says_so():
+    # Gemini answers a wrong key with 400 instead of 401
+    request = httpx.Request("POST", "http://localhost")
+    error = openai.BadRequestError("Invalid Auth key.", response=httpx.Response(400, request=request), body=None)
+    chat = OpenAIChat("gemini-3.5-flash-lite", fake_client(FakeCompletions(error)), name="Gemini",
+                      errors=ErrorText(bad_key="Check your {name} key"))
+
+    with pytest.raises(ProviderError, match="Check your Gemini key"):
+        collect(chat)

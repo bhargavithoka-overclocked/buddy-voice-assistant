@@ -12,6 +12,10 @@ GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 
 GEMINI_ERRORS = ErrorText(
     no_key="Gemini isn't connected. Open Settings to see how to get a free Gemini key.",
+    bad_key=(
+        "Google didn't accept your Gemini key. Gemini keys start with AIza. "
+        "Copy it again from aistudio.google.com/apikey, then restart Buddy."
+    ),
     not_found="The Gemini model {model} wasn't found. Check GEMINI_FAST_MODEL and GEMINI_SMART_MODEL in your .env file.",
 )
 

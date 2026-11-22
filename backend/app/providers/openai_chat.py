@@ -24,6 +24,7 @@ class ErrorText:
     no_key: str = "{name} isn't connected. Open Settings to see how to add your OpenAI key."
     not_found: str = "The {name} model {model} wasn't found. Check the model names in your .env file."
     offline: str = "I can't reach {name}. Check your internet connection."
+    bad_key: str = "{name} didn't accept your API key. Check it's copied correctly, then restart Buddy."
 
 
 @asynccontextmanager
@@ -39,6 +40,11 @@ async def friendly_errors(name: str = "ChatGPT", model: str = "", text: ErrorTex
         raise say(text.no_key) from e
     except openai.NotFoundError as e:
         raise say(text.not_found) from e
+    except openai.BadRequestError as e:
+        # Gemini answers a wrong key with 400 instead of 401
+        if "key" in str(e).lower():
+            raise say(text.bad_key) from e
+        raise ProviderError(f"{name} returned an error ({e.status_code}). Try again in a moment.") from e
     except openai.RateLimitError as e:
         raise ProviderError(f"{name} is getting too many requests right now. Try again in a moment.") from e
     except openai.APIConnectionError as e:
