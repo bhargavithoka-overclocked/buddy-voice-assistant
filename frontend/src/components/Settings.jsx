@@ -134,7 +134,10 @@ export default function Settings({ onClose }) {
           </ol>
         </details>
 
-        <p className="hint">Keys stay in <code>backend/.env</code> on your computer. Buddy never shows or sends them anywhere else.</p>
+        <p className="hint">
+          Keys stay in {window.buddyDesktop ? <code>buddy.env</code> : <code>backend/.env</code>} on your computer.
+          Buddy never shows or sends them anywhere else.
+        </p>
       </div>
     </div>
   );
