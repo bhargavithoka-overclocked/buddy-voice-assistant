@@ -73,7 +73,9 @@ async function startOllama(dataDir) {
 
 function backendCommand() {
   if (app.isPackaged) {
-    return { command: path.join(process.resourcesPath, "backend", "buddy-backend"), args: [], cwd: undefined };
+    // run it from its own folder, so Piper can use a short relative path to its data
+    const backendDir = path.join(process.resourcesPath, "backend");
+    return { command: path.join(backendDir, "buddy-backend"), args: [], cwd: backendDir };
   }
   // while developing, run the Python backend straight from the repo
   const backendDir = path.join(__dirname, "..", "..", "backend");

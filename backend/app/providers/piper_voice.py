@@ -5,11 +5,27 @@ this computer) does Buddy's voice, and the browser does the listening.
 
 import asyncio
 import io
+import os
 import wave
 from pathlib import Path
 
 from ..config import settings
 from .base import ProviderError
+
+# espeak (which Piper uses to turn words into sounds) only accepts a data folder
+# path shorter than this. A longer one makes it fall back to a path that doesn't
+# exist on this Mac and then quit the whole backend.
+ESPEAK_PATH_LIMIT = 150
+
+
+def espeak_data_dir(full_path: str) -> str | None:
+    """A path to espeak's data short enough for it, or None if there isn't one."""
+    if len(full_path) < ESPEAK_PATH_LIMIT:
+        return full_path
+    relative = os.path.relpath(full_path)
+    if len(relative) < ESPEAK_PATH_LIMIT:
+        return relative
+    return None
 
 
 class FreeSpeech:
@@ -25,8 +41,11 @@ class FreeSpeech:
             self._loaded = True
             if self.voice_path().exists():
                 from piper import PiperVoice  # imported here because it's slow to load
+                from piper.phonemize_espeak import ESPEAK_DATA_DIR
 
-                self._voice = PiperVoice.load(self.voice_path())
+                data_dir = espeak_data_dir(str(ESPEAK_DATA_DIR))
+                if data_dir is not None:  # otherwise the browser's voice takes over
+                    self._voice = PiperVoice.load(self.voice_path(), espeak_data_dir=data_dir)
         return self._voice
 
     async def transcribe(self, audio: bytes, mime: str = "audio/wav") -> str:
