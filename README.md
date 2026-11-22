@@ -8,7 +8,7 @@ There are two ways to use him: as a **Mac app** that sets everything up for you,
 
 ![CI](https://github.com/bhargavithoka-overclocked/buddy-voice-assistant/actions/workflows/ci.yml/badge.svg)
 
-![Buddy](docs/buddy.svg)
+![Buddy, waiting for "Hey Buddy"](docs/screenshot.jpg)
 
 ## Features
 
