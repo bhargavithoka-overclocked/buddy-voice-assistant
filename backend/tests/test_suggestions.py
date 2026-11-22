@@ -28,3 +28,8 @@ def test_suggestions_sent_after_reply(client):
         while (message := ws.receive_json())["type"] != "suggestions":
             pass
     assert message["items"] == ["What else can you do?", "Tell me a fun fact", "How was your day?"]
+
+
+def test_drops_speaker_labels():
+    text = "User: What is Paris known for?\nYou: Tell me more\nBuddy: Are gorillas smart?"
+    assert parse_suggestions(text) == ["What is Paris known for?", "Tell me more", "Are gorillas smart?"]

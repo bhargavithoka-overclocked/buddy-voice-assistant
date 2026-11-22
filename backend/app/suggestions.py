@@ -15,6 +15,8 @@ def parse_suggestions(text: str, limit: int = 3) -> list[str]:
     for line in text.splitlines():
         # models love to number things even when asked not to
         line = re.sub(r'^\s*(?:[-*•]|\d+[.)])\s*', "", line).strip().strip('"')
+        # small models sometimes copy the "User:" labels from the transcript
+        line = re.sub(r"^(?:user|you|buddy)\s*:\s*", "", line, flags=re.IGNORECASE).strip('"')
         if line and len(line) <= 80 and line.lower() not in (s.lower() for s in suggestions):
             suggestions.append(line)
     return suggestions[:limit]
