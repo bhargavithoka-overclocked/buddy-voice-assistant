@@ -45,13 +45,14 @@ class LocalSpeech(FreeSpeech):
         return Path(settings.whisper_dir) / settings.whisper_model
 
     def load_model(self):
-        if not self._model_loaded:
-            self._model_loaded = True
-            if (self.model_dir() / "model.bin").exists():
-                from faster_whisper import WhisperModel  # slow import, only when needed
+        with self._lock:  # a wake check and a turn can both need it at once
+            if not self._model_loaded:
+                self._model_loaded = True
+                if (self.model_dir() / "model.bin").exists():
+                    from faster_whisper import WhisperModel  # slow import, only when needed
 
-                self._model = WhisperModel(str(self.model_dir()), device="cpu", compute_type="int8")
-        return self._model
+                    self._model = WhisperModel(str(self.model_dir()), device="cpu", compute_type="int8")
+            return self._model
 
     async def transcribe(self, audio: bytes, mime: str = "audio/wav") -> str:
         model = await asyncio.to_thread(self.load_model)

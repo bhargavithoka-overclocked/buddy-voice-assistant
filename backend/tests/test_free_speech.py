@@ -50,3 +50,34 @@ def test_espeak_path_too_long_either_way(monkeypatch, tmp_path):
     deep = tmp_path / ("folder-" * 25) / "espeak-ng-data"
     monkeypatch.chdir(tmp_path.parent)  # still a long way from the data
     assert espeak_data_dir(str(deep)) is None
+
+
+def test_voice_loads_once_when_sentences_arrive_together(monkeypatch, tmp_path):
+    import sys
+    import threading
+    import time
+    import types
+
+    (tmp_path / "en_US-ryan-medium.onnx").write_bytes(b"")
+    monkeypatch.setattr(providers.settings, "voices_dir", str(tmp_path))
+    loads = []
+
+    def slow_load(path, espeak_data_dir):
+        loads.append(path)
+        time.sleep(0.2)
+        return "voice"
+
+    fake_piper = types.SimpleNamespace(PiperVoice=types.SimpleNamespace(load=slow_load))
+    monkeypatch.setitem(sys.modules, "piper", fake_piper)
+    monkeypatch.setitem(sys.modules, "piper.phonemize_espeak", types.SimpleNamespace(ESPEAK_DATA_DIR="data"))
+
+    speech = FreeSpeech()
+    results = []
+    threads = [threading.Thread(target=lambda: results.append(speech.load_voice())) for _ in range(3)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    # before the fix the 2nd and 3rd sentence got None and fell back to the browser voice
+    assert results == ["voice"] * 3
+    assert len(loads) == 1

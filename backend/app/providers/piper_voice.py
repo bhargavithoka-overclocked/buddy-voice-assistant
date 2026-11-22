@@ -6,6 +6,7 @@ this computer) does Buddy's voice, and the browser does the listening.
 import asyncio
 import io
 import os
+import threading
 import wave
 from pathlib import Path
 
@@ -32,12 +33,16 @@ class FreeSpeech:
     def __init__(self):
         self._voice = None
         self._loaded = False
+        # sentences are spoken in parallel, and only one of them should load the voice
+        self._lock = threading.Lock()
 
     def voice_path(self) -> Path:
         return Path(settings.voices_dir) / f"{settings.piper_voice}.onnx"
 
     def load_voice(self):
-        if not self._loaded:
+        with self._lock:
+            if self._loaded:
+                return self._voice
             self._loaded = True
             if self.voice_path().exists():
                 from piper import PiperVoice  # imported here because it's slow to load
