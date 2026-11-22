@@ -4,6 +4,9 @@ const PRE_ROLL_SECONDS = 0.4; // keep a little audio from before speech was dete
 const START_MS = 150; // this much loud audio counts as "started talking"
 const SILENCE_MS = 800; // this much quiet counts as "finished talking"
 const MAX_SECONDS = 30;
+// the mic hands over tiny 128-sample batches (under 3 ms). That's shorter than one
+// vibration of a voice, so the volume is measured over 20 ms frames instead.
+const FRAME_MS = 20;
 
 /**
  * Listens to the mic, works out when the user starts and stops talking
@@ -46,6 +49,8 @@ export class Microphone {
     this.preRoll = [];
     this.loudMs = 0;
     this.quietMs = 0;
+    this.pending = [];
+    this.pendingLength = 0;
   }
 
   setListening(listening) {
@@ -54,6 +59,22 @@ export class Microphone {
   }
 
   handleSamples(samples) {
+    this.pending.push(samples);
+    this.pendingLength += samples.length;
+    if (this.pendingLength < (this.context.sampleRate * FRAME_MS) / 1000) return;
+
+    const frame = new Float32Array(this.pendingLength);
+    let offset = 0;
+    for (const chunk of this.pending) {
+      frame.set(chunk, offset);
+      offset += chunk.length;
+    }
+    this.pending = [];
+    this.pendingLength = 0;
+    this.handleFrame(frame);
+  }
+
+  handleFrame(samples) {
     const rate = this.context.sampleRate;
     const ms = (samples.length / rate) * 1000;
 
@@ -74,11 +95,12 @@ export class Microphone {
       this.chunks.push(samples);
     }
 
-    const threshold = Math.max(0.015, this.noiseFloor * 3) * (this.strict ? 2.5 : 1);
+    const threshold = Math.max(0.01, this.noiseFloor * 3) * (this.strict ? 2.5 : 1);
     const loud = rms > threshold;
 
     if (!this.recording) {
-      this.loudMs = loud ? this.loudMs + ms : 0;
+      // a short dip between syllables shouldn't start the count over
+      this.loudMs = loud ? this.loudMs + ms : Math.max(0, this.loudMs - ms);
       if (this.loudMs >= (this.strict ? START_MS * 2 : START_MS)) {
         this.recording = true;
         this.chunks = [...this.preRoll];
